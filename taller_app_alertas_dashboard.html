@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taller Práctico · App de Alertas → Dashboard con Google AI Studio</title>
+<style>
+  :root{
+    --azul-noche:#0a0f24;--azul-2:#121834;--oscuro:#151b38;--codigo:#0c1230;
+    --ambar:#f5b841;--cian:#46d6e6;--violeta:#9b7bf0;--verde:#5ef2a0;--rojo:#ff6b6b;
+    --blanco:#f4f6ff;--gris:#a7b0d0;--linea:rgba(70,214,230,.16);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--gris);line-height:1.65;
+    background:
+      radial-gradient(1200px 600px at 90% -5%,rgba(155,123,240,.12),transparent 60%),
+      radial-gradient(900px 500px at -5% 10%,rgba(70,214,230,.08),transparent 55%),
+      var(--azul-noche);
+    padding-bottom:80px;
+  }
+  h1,h2,h3,h4{font-family:'Space Grotesk','Inter',sans-serif;color:var(--blanco);line-height:1.15}
+  .mono{font-family:'JetBrains Mono','Courier New',monospace}
+  a{color:var(--cian)}
+
+  /* header pegajoso + progreso */
+  header{position:sticky;top:0;z-index:50;background:rgba(10,15,36,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--linea);padding:12px clamp(16px,4vw,40px);display:flex;
+    align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  header .brand{font-family:'JetBrains Mono',monospace;font-size:.8rem;letter-spacing:.14em;color:var(--cian);text-transform:uppercase}
+  header .ptrack{flex:1;min-width:120px;height:8px;background:rgba(255,255,255,.08);border-radius:8px;overflow:hidden;max-width:320px}
+  header .pfill{height:100%;width:0;background:linear-gradient(90deg,var(--cian),var(--ambar),var(--violeta));transition:width .3s}
+  header .ptxt{font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--ambar);min-width:44px;text-align:right}
+
+  .wrap{max-width:920px;margin:0 auto;padding:0 clamp(16px,4vw,32px)}
+
+  /* hero */
+  .hero{text-align:center;padding:48px 0 20px}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:.76rem;letter-spacing:.3em;text-transform:uppercase;color:var(--cian);margin-bottom:12px}
+  .hero h1{font-size:clamp(1.9rem,5vw,3.1rem);letter-spacing:-.01em}
+  .grad{background:linear-gradient(100deg,var(--cian),var(--violeta) 52%,var(--ambar));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{max-width:720px;margin:14px auto 0;font-size:1.08rem}
+  .chips{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:20px}
+  .chip{font-family:'JetBrains Mono',monospace;font-size:.74rem;padding:7px 14px;border-radius:20px;border:1px solid var(--linea);background:rgba(70,214,230,.06);color:var(--cian)}
+
+  /* objetivos */
+  .objs{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:26px 0}
+  .obj{background:linear-gradient(180deg,var(--oscuro),var(--azul-2));border:1px solid var(--linea);border-radius:14px;padding:18px}
+  .obj .ic{font-size:1.6rem}.obj h4{font-size:1rem;margin:8px 0 6px}.obj p{font-size:.9rem}
+
+  /* arquitectura */
+  .arch-svg{width:100%;height:auto;margin:10px 0}
+
+  /* demo en vivo */
+  .demo{display:grid;grid-template-columns:280px 1fr;gap:24px;align-items:start;margin:14px 0}
+  @media(max-width:680px){.demo{grid-template-columns:1fr}}
+  .phone{background:#0b1024;border:6px solid #263056;border-radius:30px;padding:18px 14px 22px;box-shadow:0 20px 50px rgba(0,0,0,.5);position:relative}
+  .phone::before{content:"";position:absolute;top:10px;left:50%;transform:translateX(-50%);width:60px;height:6px;background:#263056;border-radius:6px}
+  .phone h3{text-align:center;color:var(--cian);font-size:1.05rem;margin:14px 0 4px}
+  .phone .sub{text-align:center;font-size:.78rem;margin-bottom:12px}
+  .phone button{display:block;width:100%;padding:14px;margin:9px 0;border:none;border-radius:12px;font-size:.95rem;font-weight:700;cursor:pointer;color:#0a0f24;transition:.15s;font-family:inherit}
+  .phone button:active{transform:scale(.97)}
+  .b-alta{background:var(--rojo)}.b-media{background:var(--ambar)}.b-baja{background:var(--verde)}
+  .phone .st{text-align:center;font-size:.78rem;color:var(--violeta);min-height:18px;margin-top:8px}
+  .dash{background:linear-gradient(180deg,var(--oscuro),var(--azul-2));border:1px solid var(--linea);border-radius:16px;padding:18px;min-height:280px}
+  .dash .dh{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .dash h3{color:var(--ambar);font-size:1.05rem}
+  .dash .cnt{font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--cian);background:rgba(70,214,230,.08);padding:4px 10px;border-radius:12px}
+  .al{border-left:5px solid var(--cian);background:#0e1430;padding:10px 14px;margin:8px 0;border-radius:8px;animation:pop .35s ease}
+  .al.alta{border-color:var(--rojo)}.al.media{border-color:var(--ambar)}.al.baja{border-color:var(--verde)}
+  .al strong{color:var(--blanco)}
+  .al .meta{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--violeta);margin-top:3px}
+  .empty{color:var(--gris);opacity:.6;text-align:center;padding:40px 0;font-size:.9rem}
+  @keyframes pop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+  /* pasos */
+  .step{background:linear-gradient(180deg,var(--oscuro),var(--azul-2));border:1px solid var(--linea);border-radius:18px;padding:clamp(18px,3vw,28px);margin:22px 0}
+  .step-h{display:flex;gap:14px;align-items:flex-start;margin-bottom:8px}
+  .num{flex-shrink:0;width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--cian),var(--violeta));color:var(--azul-noche);
+    display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.15rem}
+  .step-h h2{font-size:clamp(1.2rem,2.5vw,1.6rem)}
+  .step-h .tag{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--cian);letter-spacing:.06em}
+  .step p{margin:10px 0}
+  .step ul{margin:10px 0 10px 22px}.step li{margin:5px 0}
+  .step strong{color:var(--ambar)}
+
+  /* bloques de código */
+  .codeblock{position:relative;margin:14px 0}
+  .codeblock .lbl{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--violeta);margin-bottom:6px;letter-spacing:.05em}
+  .codeblock pre{background:var(--codigo);border:1px solid var(--linea);border-radius:12px;padding:16px 16px;overflow-x:auto;
+    font-family:'JetBrains Mono','Courier New',monospace;font-size:.84rem;color:#d6e0ff;line-height:1.6;white-space:pre}
+  .codeblock .copy{position:absolute;top:26px;right:10px;background:rgba(70,214,230,.14);color:var(--cian);border:1px solid var(--cian);
+    border-radius:8px;padding:6px 12px;font-size:.76rem;font-weight:600;cursor:pointer;font-family:inherit;transition:.2s}
+  .codeblock .copy:hover{background:var(--cian);color:var(--azul-noche)}
+  .cm{color:#6d7aa8}
+
+  /* callouts */
+  .note{border-left:4px solid var(--cian);background:rgba(70,214,230,.06);border-radius:8px;padding:12px 16px;margin:14px 0;font-size:.92rem}
+  .note.warn{border-color:var(--ambar);background:rgba(245,184,65,.07)}
+  .note.tip{border-color:var(--verde);background:rgba(94,242,160,.07)}
+  details{background:var(--codigo);border:1px solid var(--linea);border-radius:12px;padding:6px 16px;margin:12px 0}
+  summary{cursor:pointer;color:var(--ambar);font-weight:600;padding:8px 0}
+  details p,details li{font-size:.9rem}
+
+  /* checkbox de paso */
+  .done{display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:14px;border-top:1px dashed var(--linea)}
+  .done input{width:20px;height:20px;accent-color:var(--verde);cursor:pointer}
+  .done label{font-size:.9rem;color:var(--gris);cursor:pointer}
+
+  .retos{background:linear-gradient(135deg,rgba(155,123,240,.12),rgba(70,214,230,.08));border:1px solid var(--linea);border-radius:18px;padding:clamp(18px,3vw,28px);margin:22px 0}
+  .retos h2{margin-bottom:10px}
+  .foot{text-align:center;color:var(--gris);font-size:.85rem;margin-top:30px;opacity:.75}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="brand">Ecotec · Taller de IA</span>
+  <div class="ptrack"><div class="pfill" id="pfill"></div></div>
+  <span class="ptxt" id="ptxt">0%</span>
+</header>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="eyebrow">Taller práctico · Nivel principiante</div>
+    <h1>De una alerta en el <span class="grad">teléfono</span> al <span class="grad">dashboard</span></h1>
+    <p>Construirás un sistema completo: una app móvil que <strong>emite alertas</strong>, un servidor que las <strong>recibe</strong> y un dashboard de back-office que las <strong>muestra en tiempo real</strong>. Usaremos Google AI Studio para acelerar el frontend y PowerShell para instalar el servidor y la base de datos.</p>
+    <div class="chips"><span class="chip">Google AI Studio</span><span class="chip">Node.js + Express</span><span class="chip">MongoDB</span><span class="chip">PowerShell</span><span class="chip">tiempo real</span></div>
+  </section>
+
+  <!-- OBJETIVOS -->
+  <div class="objs">
+    <div class="obj"><div class="ic">🌐</div><h4>Crear apps web</h4><p>Generarás una app móvil y un dashboard con Gemini en Google AI Studio.</p></div>
+    <div class="obj"><div class="ic">🔌</div><h4>Montar un servidor</h4><p>Levantarás un servidor Node.js que conecta la app con el dashboard.</p></div>
+    <div class="obj"><div class="ic">🗄️</div><h4>Instalar una base de datos</h4><p>Copiarás comandos de PowerShell para instalar una instancia de MongoDB.</p></div>
+  </div>
+
+  <!-- ARQUITECTURA -->
+  <div class="step">
+    <div class="step-h"><div class="num">🗺️</div><div><span class="tag">EL MAPA</span><h2>Cómo se conecta todo</h2></div></div>
+    <p>Antes de escribir código, entiende el flujo. Una alerta viaja así:</p>
+    <svg class="arch-svg" viewBox="0 0 900 220" xmlns="http://www.w3.org/2000/svg">
+      <!-- App -->
+      <rect x="20" y="70" width="150" height="90" rx="12" fill="#151b38" stroke="#46d6e6" stroke-width="2"/>
+      <text x="95" y="105" text-anchor="middle" fill="#f4f6ff" font-size="22">📱</text>
+      <text x="95" y="130" text-anchor="middle" fill="#f4f6ff" font-family="'Space Grotesk',sans-serif" font-size="13">App móvil</text>
+      <text x="95" y="148" text-anchor="middle" fill="#a7b0d0" font-family="monospace" font-size="10">emite alerta</text>
+      <!-- flecha -->
+      <line x1="170" y1="115" x2="255" y2="115" stroke="#f5b841" stroke-width="2" marker-end="url(#a)"/>
+      <text x="212" y="105" text-anchor="middle" fill="#f5b841" font-family="monospace" font-size="10">POST</text>
+      <!-- Servidor -->
+      <rect x="260" y="60" width="170" height="110" rx="12" fill="#151b38" stroke="#9b7bf0" stroke-width="2"/>
+      <text x="345" y="98" text-anchor="middle" fill="#f4f6ff" font-size="22">🖥️</text>
+      <text x="345" y="122" text-anchor="middle" fill="#f4f6ff" font-family="'Space Grotesk',sans-serif" font-size="13">Servidor</text>
+      <text x="345" y="140" text-anchor="middle" fill="#a7b0d0" font-family="monospace" font-size="10">Node + Express</text>
+      <!-- flecha a BD -->
+      <line x1="345" y1="170" x2="345" y2="200" stroke="#5ef2a0" stroke-width="2" marker-end="url(#a)"/>
+      <rect x="270" y="200" width="150" height="14" rx="6" fill="none"/>
+      <text x="345" y="212" text-anchor="middle" fill="#5ef2a0" font-family="monospace" font-size="10">guarda en 🗄️ MongoDB</text>
+      <!-- flecha a dashboard -->
+      <line x1="430" y1="115" x2="515" y2="115" stroke="#46d6e6" stroke-width="2" marker-end="url(#a)"/>
+      <text x="472" y="105" text-anchor="middle" fill="#46d6e6" font-family="monospace" font-size="10">stream</text>
+      <!-- Dashboard -->
+      <rect x="520" y="60" width="180" height="110" rx="12" fill="#151b38" stroke="#f5b841" stroke-width="2"/>
+      <text x="610" y="98" text-anchor="middle" fill="#f4f6ff" font-size="22">📊</text>
+      <text x="610" y="122" text-anchor="middle" fill="#f4f6ff" font-family="'Space Grotesk',sans-serif" font-size="13">Dashboard</text>
+      <text x="610" y="140" text-anchor="middle" fill="#a7b0d0" font-family="monospace" font-size="10">back-office</text>
+      <text x="795" y="118" text-anchor="middle" fill="#a7b0d0" font-size="30">👀</text>
+      <defs><marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><polygon points="0 0,9 3,0 6" fill="#f5b841"/></marker></defs>
+    </svg>
+    <p class="mono" style="font-size:.85rem;color:var(--cian)">📱 App → (POST) → 🖥️ Servidor → 🗄️ Base de datos → (stream) → 📊 Dashboard</p>
+  </div>
+
+  <!-- DEMO EN VIVO -->
+  <div class="step">
+    <div class="step-h"><div class="num">▶</div><div><span class="tag">VISTA PREVIA</span><h2>Esto es lo que vas a construir</h2></div></div>
+    <p>Prueba la maqueta aquí mismo (funciona en esta página, sin servidor todavía). Toca los botones del teléfono y mira el dashboard.</p>
+    <div class="demo">
+      <div class="phone">
+        <h3>🚨 Emisor</h3>
+        <div class="sub">App del teléfono (maqueta)</div>
+        <button class="b-alta" onclick="demoEnviar('alta','Emergencia crítica')">🔴 Enviar alerta ALTA</button>
+        <button class="b-media" onclick="demoEnviar('media','Situación a revisar')">🟡 Enviar alerta MEDIA</button>
+        <button class="b-baja" onclick="demoEnviar('baja','Aviso informativo')">🟢 Enviar alerta BAJA</button>
+        <div class="st" id="demoSt"></div>
+      </div>
+      <div class="dash">
+        <div class="dh"><h3>📊 Dashboard</h3><span class="cnt" id="demoCnt">0 alertas</span></div>
+        <div id="demoList"><div class="empty">Sin alertas todavía. Envía una desde el teléfono →</div></div>
+      </div>
+    </div>
+    <div class="note tip">💡 En la maqueta todo ocurre dentro del navegador. En el taller real, la app y el dashboard estarán en <em>páginas separadas</em> conectadas por tu propio servidor.</div>
+  </div>
+
+  <!-- PASO 1 -->
+  <div class="step">
+    <div class="step-h"><div class="num">1</div><div><span class="tag">POWERSHELL · 5 MIN</span><h2>Preparar el entorno</h2></div></div>
+    <p>Abre <strong>PowerShell como Administrador</strong> (clic derecho → “Ejecutar como administrador”) y pega estos comandos uno por uno.</p>
+    <div class="codeblock">
+      <div class="lbl">PowerShell — instalar Node.js</div>
+      <button class="copy" onclick="copiar(this)">📋 Copiar</button>
+<pre># Instala Node.js (incluye npm) con el gestor de paquetes de Windows
+winget install OpenJS.NodeJS.LTS -e
+
+# Cierra y vuelve a abrir PowerShell. Luego verifica que quedó instalado:
+node -v
+npm -v</pre>
+    </div>
+    <div class="note warn">⚠️ Si <span class="mono">winget</span> no se reconoce, actualiza la “App Installer” desde la Microsoft Store, o descarga Node.js desde <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a> (versión LTS).</div>
+    <div class="done"><input type="checkbox" class="chk" id="c1"><label for="c1">Node.js instalado y verificado (<span class="mono">node -v</span> muestra una versión)</label></div>
+  </div>
+
+  <!-- PASO 2 -->
+  <div class="step">
+    <div class="step-h"><div class="num">2</div><div><span class="tag">POWERSHELL · BASE DE DATOS</span><h2>Instalar una instancia de MongoDB</h2></div></div>
+    <p>La base de datos es donde el servidor <strong>guarda</strong> cada alerta. Instalaremos MongoDB, que se ejecuta como un <strong>servicio</strong> (una “instancia” siempre encendida) en tu computadora.</p>
+    <div class="codeblock">
+      <div class="lbl">PowerShell — instalar MongoDB</div>
+      <button class="copy" onclick="copiar(this)">📋 Copiar</button>
+<pre># Instala el servidor de MongoDB (queda como servicio en localhost:27017)
+winget install MongoDB.Server -e
+
+# (Opcional) Instala Compass, una interfaz gráfica para ver los datos
+winget install MongoDB.Compass.Full -e
+
+# Verifica que el servicio de la base de datos está corriendo:
+Get-Service MongoDB</pre>
+    </div>
+    <div class="codeblock">
+      <div class="lbl">PowerShell — si el servicio no está iniciado</div>
+      <button class="copy" onclick="copiar(this)">📋 Copiar</button>
+<pre># Inícialo manualmente (requiere PowerShell como Administrador)
+Start-Service MongoDB</pre>
+    </div>
+    <details>
+      <summary>¿Prefieres usar Docker en vez de instalar MongoDB? (alternativa)</summary>
+      <p>Docker te deja levantar la base de datos como un “contenedor” — otra forma de instancia. Útil si no quieres instalar MongoDB directamente.</p>
+      <div class="codeblock">
+        <button class="copy" onclick="copiar(this)">📋 Copiar</button>
+<pre># 1) Instala Docker Desktop (pedirá reiniciar la primera vez)
+winget install Docker.DockerDesktop -e
+
+# 2) Con Docker abierto, levanta una instancia de MongoDB en un comando:
+docker run -d --name alertas-db -p 27017:27017 mongo:7</pre>
+      </div>
+    </details>
+    <div class="note">🧠 <strong>Concepto clave:</strong> una “instancia” de base de datos es simplemente un motor de base de datos <em>en ejecución</em>, escuchando en un puerto (aquí el <span class="mono">27017</span>) para que tu servidor se conecte a él.</div>
+    <div class="note tip">✅ No te preocupes si algo falla aquí: el servidor del Paso 4 tiene un <strong>respaldo en memoria</strong> y funcionará igual mientras solucionas la base de datos.</div>
+    <div class="done"><input type="checkbox" class="chk" id="c2"><label for="c2">Base de datos instalada (o Docker corriendo la instancia)</label></div>
+  </div>
+
+  <!-- PASO 3 -->
+  <div class="step">
+    <div class="step-h"><div class="num">3</div><div><span class="tag">GOOGLE AI STUDIO</span><h2>Generar el frontend con Gemini</h2></div></div>
+    <p>Vamos a crear la interfaz (la app y el dashboard) describiéndola en palabras. Entra a <a href="https://aistudio.google.com" target="_blank" rel="noopener">aistudio.google.com</a>, inicia sesión con tu cuenta de Google y abre la pestaña <strong>Build</strong> (“Construir”). Pega este prompt en el cuadro de texto:</p>
+    <div class="codeblock">
+      <div class="lbl">Prompt para Google AI Studio (Build)</div>
+      <button class="copy" onclick="copiar(this)">📋 Copiar</button>
+<pre>Crea una aplicación web de "sistema de alertas" con dos pantallas:
+
+1) Una pantalla tipo APP DE TELÉFONO con tres botones grandes para enviar
+   alertas de prioridad ALTA (rojo), MEDIA (ámbar) y BAJA (verde).
+   Cada botón envía la alerta a un backend.
+
+2) Una pantalla tipo DASHBOARD de back-office que lista las alertas recibidas,
+   cada una con su prioridad (color), mensaje, origen y fecha/hora, y que se
+   actualiza en tiempo real.
+
+Backend: Node.js con Express. Expón POST /api/alertas para recibir alertas y
+GET /api/alertas para listarlas.
+
+Estilo: moderno, modo oscuro, colores azul noche (#0a0f24), ámbar (#f5b841)
+y cian (#46d6e6). Tipografía limpia. En español.</pre>
+    </div>
+    <p>Gemini generará la app completa. Puedes <strong>iterar por chat</strong> (“haz los botones más grandes”, “agrega un sonido”) o usar el <strong>modo anotación</strong> para señalar partes de la pantalla y pedir cambios.</p>
+    <ul>
+      <li>Prueba la app en el panel de <strong>vista previa</strong>.</li>
+      <li>Abre la pestaña <strong>Code</strong> para leer el código que generó (¡así aprendes!).</li>
+      <li>Usa <strong>Download ZIP</strong> para llevártelo a tu computadora, o <strong>Deploy</strong> para publicarlo.</li>
+    </ul>
+    <div class="note">🎓 <strong>Objetivo pedagógico:</strong> AI Studio te da una base en segundos. En los pasos 4–6 construimos <em>nuestra propia</em> versión del servidor para entender cómo funciona por dentro la comunicación app ↔ dashboard.</div>
+    <div class="done"><input type="checkbox" class="chk" id="c3"><label for="c3">Generé y probé la app en Google AI Studio</label></div>
+  </div>
+
+  <!-- PASO 4 -->
+  <div class="step">
+    <div class="step-h"><div class="num">4</div><div><span class="tag">EL SERVIDOR · NODE + EXPRESS</span><h2>Crear el servidor que conecta todo</h2></div></div>
+    <p>El servidor es el intermediario: recibe las alertas de la app y las reenvía al dashboard. Crea la carpeta del proyecto e instala las dependencias:</p>
+    <div class="codeblock">
+      <div class="lbl">PowerShell — crear el proyecto</div>
+      <button class="copy" onclick="copiar(this)">📋 Copiar</button>
+<pre># Crea la carpeta del taller y entra en ella
+mkdir taller-alertas; cd taller-alertas
+
+# Inicializa el proyecto de Node e instala las librerías
+npm init -y
+npm install express cors mongodb
+
+# Crea la carpeta donde vivirán la app y el dashboard
+mkdir publico</pre>
+    </div>
+    <p>Ahora crea un archivo llamado <strong class="mono">server.js</strong> dentro de <span class="mono">taller-alertas</span> y pega este código:</p>
+    <div class="codeblock">
+      <div class="lbl">server.js</div>
+      <button class="copy" onclick="copiar(this)">📋 Copiar</button>
+<pre><span class="cm">// server.js — Servidor de alertas (Node.js + Express + MongoDB)</span>
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const { MongoClient } = require('mongodb');
+
+const app = express();
+const PUERTO = 3000;
+const URL_MONGO = 'mongodb://127.0.0.1:27017';
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'publico'))); <span class="cm">// sirve app.html y dashboard.html</span>
+
+let coleccion = null;   <span class="cm">// colección de MongoDB (si está disponible)</span>
+let memoria = [];       <span class="cm">// respaldo si no hay base de datos</span>
+const dashboards = [];  <span class="cm">// conexiones del dashboard en tiempo real</span>
+
+<span class="cm">// Intenta conectar a MongoDB; si no, usa memoria temporal</span>
+(async () => {
+  try {
+    const cliente = new MongoClient(URL_MONGO, { serverSelectionTimeoutMS: 1500 });
+    await cliente.connect();
+    coleccion = cliente.db('taller').collection('alertas');
+    console.log('✅ Conectado a MongoDB');
+  } catch (e) {
+    console.log('⚠️  MongoDB no disponible: usando memoria temporal');
+  }
+})();
+
+<span class="cm">// 1) Recibe una alerta desde la app del teléfono</span>
+app.post('/api/alertas', async (req, res) => {
+  const alerta = {
+    tipo: req.body.tipo || 'baja',
+    mensaje: req.body.mensaje || 'Alerta sin descripción',
+    origen: req.body.origen || 'App móvil',
+    fecha: new Date().toISOString()
+  };
+  if (coleccion) await coleccion.insertOne(alerta);
+  else memoria.unshift(alerta);
+  <span class="cm">// Avisa a todos los dashboards conectados, al instante</span>
+  dashboards.forEach(d => d.write('data: ' + JSON.stringify(alerta) + '\n\n'));
+  res.json({ ok: true, alerta });
+});
+
+<span class="cm">// 2) Lista las alertas (cuando el dashboard carga)</span>
+app.get('/api/alertas', async (req, res) => {
+  const datos = coleccion
+    ? await coleccion.find().sort({ fecha: -1 }).limit(50).toArray()
+    : memoria;
+  res.json(datos);
+});
+
+<span class="cm">// 3) Canal en tiempo real (Server-Sent Events)</span>
+app.get('/api/stream', (req, res) => {
+  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+  res.flushHeaders();
+  dashboards.push(res);
+  req.on('close', () => {
+    const i = dashboards.indexOf(res);
+    if (i >= 0) dashboards.splice(i, 1);
+  });
+});
+
+app.listen(PUERTO, () => console.log('🚀 Servidor en http://localhost:' + PUERTO));</pre>
+    </div>
+    <div class="note"><strong>¿Qué hace cada ruta?</strong><br>• <span class="mono">POST /api/alertas</span> → la app envía aquí la alerta.<br>• <span class="mono">GET /api/alertas</span> → el dashboard pide el historial.<br>• <span class="mono">GET /api/stream</span> → el dashboard queda “escuchando” para recibir alertas nuevas al instante.</div>
+    <div class="done"><input type="checkbox" class="chk" id="c4"><label for="c4">Creé server.js e instalé express, cors y mongodb</label></div>
+  </div>
+
+  <!-- PASO 5 -->
+  <div class="step">
+    <div class="step-h"><div class="num">5</div><div><span class="tag">LA APP MÓVIL</span><h2>La pantalla que emite alertas</h2></div></div>
+    <p>Dentro de la carpeta <span class="mono">publico</span>, crea <strong class="mono">app.html</strong> con este contenido. Es la app del teléfono que envía la alerta al servidor.</p>
+    <div class="codeblock">
+      <div class="lbl">publico/app.html</div>
+      <button class="copy" onclick="copiar(this)">📋 Copiar</button>
+<pre>&lt;!DOCTYPE html&gt;
+&lt;html lang="es"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;title&gt;App de Alertas&lt;/title&gt;
+  &lt;style&gt;
+    body{font-family:sans-serif;background:#0a0f24;color:#fff;text-align:center;padding:24px}
+    h1{color:#46d6e6}
+    button{display:block;width:100%;padding:16px;margin:10px 0;border:none;border-radius:12px;
+      font-size:16px;font-weight:bold;cursor:pointer;color:#0a0f24}
+    .alta{background:#ff6b6b}.media{background:#f5b841}.baja{background:#5ef2a0}
+    #estado{margin-top:16px;color:#9b7bf0}
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;🚨 Emisor de Alertas&lt;/h1&gt;
+  &lt;p&gt;Toca un botón para enviar una alerta al dashboard.&lt;/p&gt;
+  &lt;button class="alta"  onclick="enviar('alta','Emergencia crítica')"&gt;🔴 Alerta ALTA&lt;/button&gt;
+  &lt;button class="media" onclick="enviar('media','Situación a revisar')"&gt;🟡 Alerta MEDIA&lt;/button&gt;
+  &lt;button class="baja"  onclick="enviar('baja','Aviso informativo')"&gt;🟢 Alerta BAJA&lt;/button&gt;
+  &lt;p id="estado"&gt;&lt;/p&gt;
+  &lt;script&gt;
+    async function enviar(tipo, mensaje){
+      const estado = document.getElementById('estado');
+      try{
+        const r = await fetch('/api/alertas', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ tipo, mensaje, origen:'App móvil' })
+        });
+        const data = await r.json();
+        estado.textContent = '✅ Enviada: ' + data.alerta.tipo;
+      }catch(e){
+        estado.textContent = '❌ Error: ¿está corriendo el servidor?';
+      }
+    }
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+    </div>
+    <div class="done"><input type="checkbox" class="chk" id="c5"><label for="c5">Creé publico/app.html</label></div>
+  </div>
+
+  <!-- PASO 6 -->
+  <div class="step">
+    <div class="step-h"><div class="num">6</div><div><span class="tag">EL DASHBOARD</span><h2>La pantalla que recibe las alertas</h2></div></div>
+    <p>Ahora crea <strong class="mono">dashboard.html</strong>, también dentro de <span class="mono">publico</span>. Carga el historial y escucha las alertas nuevas en tiempo real.</p>
+    <div class="codeblock">
+      <div class="lbl">publico/dashboard.html</div>
+      <button class="copy" onclick="copiar(this)">📋 Copiar</button>
+<pre>&lt;!DOCTYPE html&gt;
+&lt;html lang="es"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;title&gt;Dashboard de Alertas&lt;/title&gt;
+  &lt;style&gt;
+    body{font-family:sans-serif;background:#0a0f24;color:#fff;padding:24px}
+    h1{color:#f5b841}
+    .alerta{border-left:6px solid #46d6e6;background:#151b38;padding:12px 16px;margin:8px 0;border-radius:8px}
+    .alta{border-color:#ff6b6b}.media{border-color:#f5b841}.baja{border-color:#5ef2a0}
+    .fecha{font-size:12px;color:#9b7bf0;margin-top:4px}
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;📊 Dashboard de Alertas (Back-office)&lt;/h1&gt;
+  &lt;p&gt;Las alertas aparecen aquí en tiempo real.&lt;/p&gt;
+  &lt;div id="lista"&gt;&lt;/div&gt;
+  &lt;script&gt;
+    const lista = document.getElementById('lista');
+    function pintar(a){
+      const div = document.createElement('div');
+      div.className = 'alerta ' + a.tipo;
+      div.innerHTML = '&lt;strong&gt;' + a.tipo.toUpperCase() + '&lt;/strong&gt; — ' + a.mensaje +
+        '&lt;div class="fecha"&gt;' + new Date(a.fecha).toLocaleString() + ' · ' + a.origen + '&lt;/div&gt;';
+      lista.prepend(div);
+    }
+    <span class="cm">// 1) Carga las alertas ya guardadas</span>
+    fetch('/api/alertas').then(r =&gt; r.json()).then(d =&gt; d.reverse().forEach(pintar));
+    <span class="cm">// 2) Escucha nuevas alertas en tiempo real</span>
+    const stream = new EventSource('/api/stream');
+    stream.onmessage = (e) =&gt; pintar(JSON.parse(e.data));
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+    </div>
+    <div class="done"><input type="checkbox" class="chk" id="c6"><label for="c6">Creé publico/dashboard.html</label></div>
+  </div>
+
+  <!-- PASO 7 -->
+  <div class="step">
+    <div class="step-h"><div class="num">7</div><div><span class="tag">¡A PROBAR!</span><h2>Encender el servidor y ver la magia</h2></div></div>
+    <p>Desde la carpeta <span class="mono">taller-alertas</span> en PowerShell, enciende el servidor:</p>
+    <div class="codeblock">
+      <div class="lbl">PowerShell — arrancar el servidor</div>
+      <button class="copy" onclick="copiar(this)">📋 Copiar</button>
+<pre>node server.js</pre>
+    </div>
+    <p>Verás <span class="mono">🚀 Servidor en http://localhost:3000</span>. Ahora abre <strong>dos pestañas</strong> en tu navegador:</p>
+    <ul>
+      <li>📱 La app: <span class="mono">http://localhost:3000/app.html</span></li>
+      <li>📊 El dashboard: <span class="mono">http://localhost:3000/dashboard.html</span></li>
+    </ul>
+    <p>Coloca las ventanas lado a lado, toca un botón en la app… y observa cómo la alerta <strong>aparece al instante</strong> en el dashboard. 🎉</p>
+    <details>
+      <summary>🛠️ Solución de problemas frecuentes</summary>
+      <ul>
+        <li><strong>“node no se reconoce”</strong> → cierra y abre PowerShell otra vez; si sigue, reinstala Node.js.</li>
+        <li><strong>El dashboard no muestra nada</strong> → confirma que el servidor esté corriendo y que abriste las URLs con <span class="mono">http://localhost:3000</span> (no abriendo el archivo directamente).</li>
+        <li><strong>“Error: ¿está corriendo el servidor?”</strong> en la app → vuelve a la pestaña de PowerShell; el servidor debe seguir encendido.</li>
+        <li><strong>Puerto 3000 ocupado</strong> → cambia <span class="mono">PUERTO = 3000</span> por <span class="mono">3001</span> en server.js.</li>
+        <li><strong>MongoDB no conecta</strong> → no pasa nada: el servidor usa memoria temporal. Revisa <span class="mono">Get-Service MongoDB</span>.</li>
+      </ul>
+    </details>
+    <div class="done"><input type="checkbox" class="chk" id="c7"><label for="c7">¡Envié una alerta y apareció en el dashboard!</label></div>
+  </div>
+
+  <!-- RETOS -->
+  <div class="retos">
+    <h2>🚀 Retos para seguir aprendiendo</h2>
+    <ul>
+      <li><strong>Sonido y color:</strong> haz que el dashboard emita un “bip” y parpadee cuando llega una alerta ALTA.</li>
+      <li><strong>Filtro:</strong> agrega botones en el dashboard para mostrar solo alertas de cierta prioridad.</li>
+      <li><strong>Ubicación:</strong> que la app envíe también la geolocalización del teléfono con la alerta.</li>
+      <li><strong>Persistencia real:</strong> confirma con MongoDB Compass que las alertas quedan guardadas aunque reinicies el servidor.</li>
+      <li><strong>Publicar:</strong> vuelve a Google AI Studio y usa <em>Deploy</em> (Cloud Run) para poner tu app en internet.</li>
+    </ul>
+  </div>
+
+  <p class="foot">Taller de Inteligencia Artificial · Universidad Ecotec · Construido para aprender haciendo.</p>
+
+</div>
+
+<script>
+/* ---------- barra de progreso por checkboxes ---------- */
+const checks=[...document.querySelectorAll('.chk')];
+function actualizar(){
+  const hechos=checks.filter(c=>c.checked).length;
+  const pct=Math.round(hechos/checks.length*100);
+  document.getElementById('pfill').style.width=pct+'%';
+  document.getElementById('ptxt').textContent=pct+'%';
+}
+checks.forEach(c=>c.addEventListener('change',actualizar));
+
+/* ---------- copiar código ---------- */
+function copiar(btn){
+  const pre=btn.parentElement.querySelector('pre');
+  const texto=pre.innerText;
+  navigator.clipboard.writeText(texto).then(()=>{
+    const orig=btn.textContent;btn.textContent='✅ Copiado';
+    setTimeout(()=>btn.textContent=orig,1500);
+  }).catch(()=>{btn.textContent='⚠️ Copia manual';});
+}
+
+/* ---------- demo en vivo (sin servidor) ---------- */
+let demoCount=0;
+const mensajes={alta:'Emergencia crítica',media:'Situación a revisar',baja:'Aviso informativo'};
+function demoEnviar(tipo){
+  demoCount++;
+  const list=document.getElementById('demoList');
+  const empty=list.querySelector('.empty');if(empty)empty.remove();
+  const div=document.createElement('div');
+  div.className='al '+tipo;
+  const hora=new Date().toLocaleTimeString();
+  div.innerHTML='<strong>'+tipo.toUpperCase()+'</strong> — '+mensajes[tipo]+
+    '<div class="meta">'+hora+' · App móvil</div>';
+  list.prepend(div);
+  document.getElementById('demoCnt').textContent=demoCount+(demoCount===1?' alerta':' alertas');
+  const st=document.getElementById('demoSt');
+  st.textContent='✅ Alerta '+tipo+' enviada';
+  setTimeout(()=>{if(st.textContent.includes(tipo))st.textContent=''},1400);
+}
+</script>
+</body>
+</html>
